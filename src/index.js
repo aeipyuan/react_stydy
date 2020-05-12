@@ -1,9 +1,11 @@
 import React from './react';
-// function show() {
-//   alert(1);
-// }
-// let element = React.createElement("h1", { class: "app" },
-//   "hello", React.createElement("button", { onClick: show }, "123"));
+// import ReactDom from 'react-dom'
+function show() {
+  alert(1);
+}
+let element = React.createElement("h1", { class: "app", style: "color:red;font-size:100px;" }, "hello", React.createElement("button", { onClick: show }, "123"));
+
+// console.log(element)
 
 class SubCounter {
   componentWillMount() {
@@ -13,10 +15,9 @@ class SubCounter {
     console.log("child  挂载完成");
   }
   render() {
-    return "123"
+    return <h1 style="color:green" onClick={show}>888</h1>
   }
 }
-
 class Counter extends React.Component {
   constructor(props) {
     super(props);
@@ -29,11 +30,10 @@ class Counter extends React.Component {
     console.log("parent  挂载完成")
   }
   render() {
-    return React.createElement(SubCounter, { name: 1 });
+    return <SubCounter />;
   }
 }
-{/* <Counter name="aeipyuan"></Counter> */ }
 React.render(
-  <Counter />,
+  <Counter name="mike" />,
   document.getElementById('root')
 );

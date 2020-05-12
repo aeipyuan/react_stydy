@@ -1,18 +1,22 @@
 import $ from 'jquery'
-import createReactUnit from './unit.js'
-import createElement from './element.js'
+import createElement from './element'
+import createReactUnit from './unit';
 import Component from './component'
+/* React对象 */
 let React = {
-    render,
-    nextRootIndex: 0,
     createElement,
+    render,
+    nextRootIndex: 0,/* 元素编号 */
     Component
 }
+/* render负责将转化的element渲染到页面 */
 function render(element, container) {
+    /* 创建单元并编号 */
     let createReactUnitInstance = createReactUnit(element);
-    let makeUp = createReactUnitInstance.getMarkUp(React.nextRootIndex);
-    $(container).html(makeUp);
-    /* 发布订阅 */
+    let markUp = createReactUnitInstance.getMarkUp(React.nextRootIndex);
+    /* 渲染到容器上 */
+    $(container).html(markUp);
+    /* 触发订阅函数 */
     $(document).trigger('mounted');
 }
-export default React;
+export default React

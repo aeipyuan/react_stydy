@@ -9,4 +9,4 @@ function createElement(type, props, ...children) {
     props.children = children;
     return new Element(type, props);
 }
-export default createElement
+export default createElement;

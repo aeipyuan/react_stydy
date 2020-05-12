@@ -1,68 +1,237 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# 实现一个精简版React
+---
+## React.createElement
 
-## Available Scripts
+作用：将babel解析的结果转换成树形结构
 
-In the project directory, you can run:
+```javascript
+class Element {
+    constructor(type, props) {
+        this.type = type;
+        this.props = props;
+    }
+}
+function createElement(type, props, ...children) {
+    props = props || {};
+    props.children = children;
+    return new Element(type, props);
+}
+export default createElement
+```
 
-### `npm start`
+转化前：
 
-Runs the app in the development mode.<br />
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+```javascript
+let element = React.createElement("h1",
+  { class: "app", style: "color:red;font-size:100px;" },
+  "hello",
+  React.createElement("button", null, "123"));
+```
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+转化后：
 
-### `npm test`
+![](https://imgconvert.csdnimg.cn/aHR0cHM6Ly9naXRlZS5jb20vYWVpcHl1YW4vcGljdHVyZV9iZWQvcmF3L21hc3Rlci9pbWFnZXMvMjAyMDA1MTIxMDU0NTIucG5n?x-oss-process=image/format,png)
 
-Launches the test runner in the interactive watch mode.<br />
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## React.render
 
-### `npm run build`
+作用：渲染元素到对应位置
 
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```javascript
+/* react.js */
+import $ from 'jquery'
+import createElement from './element'
+import createReactUnit from './unit';
+import Component from './component'
+/* React对象 */
+let React = {
+    createElement,
+    render,
+    nextRootIndex: 0,/* 元素编号 */
+    Component
+}
+/* render负责将转化的element渲染到页面 */
+function render(element, container) {
+    /* 创建单元并编号 */
+    let createReactUnitInstance = createReactUnit(element);
+    let markUp = createReactUnitInstance.getMarkUp(React.nextRootIndex);
+    /* 渲染到容器上 */
+    $(container).html(markUp);
+    /* 触发订阅函数 */
+    $(document).trigger('mounted');
+}
+```
+#### createReactUnit
 
-The build is minified and the filenames include the hashes.<br />
-Your app is ready to be deployed!
+createReactUnit函数负责将传入的格式化element分为三类分别处理(文本，原生元素，组件)，另外创建一个父类，减少冗余代码
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```javascript
+import $ from 'jquery'
+/* 创建一个父类，放置多次重复写constructor */
+class Unit {
+    constructor(element) { this.currentElement = element;  }
+}
+/* 文本单元 */
+class ReactTextUnit extends Unit {
+    getMarkUp(rootId) {
+        //...
+    }
+}
+/* 原生单元 */
+class ReactNativeUnit extends Unit {
+    getMarkUp(rootId) {
+        //...
+    }
+}
+/* 组件单元 */
+class ReactComponent extends Unit {
+    getMarkUp(rootId) {
+        //...
+    }
+}
+/* 根据不同类型生成不同单元 */
+function createReactUnit(element) {
+    /* 创建文本单元 */
+    if (typeof element === "string" || typeof element === "number") {
+        return new ReactTextUnit(element);
+    }
+    /* 创建标签 */
+    if (typeof element === "object" && typeof element.type === "string") {
+        return new ReactNativeUnit(element);
+    }
+    /* 组件 */
+    if (typeof element === "object"  && typeof element.type === "function") {
+        return new ReactComponent(element);
+    }
+}
+export default createReactUnit
+```
+1. 文本     
+直接在用`span`包围并记录`data-reactid`
+```javascript
+class ReactTextUnit extends Unit {
+    getMarkUp(rootId) {
+        /* 存rootId */
+        this._rootId = rootId;
+        /* <span data-reactid="0">111</span> */
+        return `<span data-reactid="${rootId}">${this.currentElement}</span>`;
+    }
+}
+```
+2. 原生标签     
+通过字符串拼接的方式连接属性，对于`children`，通过递归的方式创建子单元，用一个字符串`content`来存生成的标签字符串，对于`onClick`等事件绑定，使用`$(document).on()`绑定事件解决字符串无法绑定的问题
 
-### `npm run eject`
+```javascript
+class ReactNativeUnit extends Unit {
+    getMarkUp(rootId) {
+        this._rootId = rootId;
+        /* 提取数据 */
+        let { type, props } = this.currentElement;
+        /* 创建外围标签 */
+        let tagStart = `<${type} data-reactid=${rootId}`, tagEnd = `</${type}>`;
+        /* 遍历标签属性 */
+        let content = "";
+        for (let key in props) {
+            /* 儿子结点 */
+            if (key === "children") {
+                content += props[key].map((child, index) => {
+                    let childUnit = createReactUnit(child);
+                    return childUnit.getMarkUp(`${rootId}.${index}`)
+                }).join('');
+            }
+            /* {onClick:show} 事件 */
+            else if (/^on[A-Z]/.test(key)) {
+                /* 绑定事件 */
+                let eventType = key.slice(2).toLowerCase();
+                $(document).on(eventType, `[data-reactid="${rootId}"]`, props[key]);
+            }
+            /* 普通属性 */
+            else
+                tagStart += ` ${key}="${props[key]}" `;
+        }
+        /* 拼接返回 */
+        return `${tagStart}>${content}${tagEnd}`;
+    }
+}
+```
+传入element
+```html
+(
+<h1 class="app" style="color:red;font-size:100px;">
+    hello
+    <button onClick={show}>123</button>
+</h1>
+)
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+效果
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+![](https://imgconvert.csdnimg.cn/aHR0cHM6Ly9naXRlZS5jb20vYWVpcHl1YW4vcGljdHVyZV9iZWQvcmF3L21hc3Rlci9pbWFnZXMvMjAyMDA1MTIxMzIwMTgucG5n?x-oss-process=image/format,png)
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+3. 组件
+`babel`解析组件的结果第一个值是`Counter`类，调用`createElement`后赋值到`type`上，生成单元时可以通过`type`获取到`Counter`,然后新建实例获得类中`render`方法的结果，对结果进行创建单元和调用`getMarkUp`方法，得到标签字符串`markUp`并返回，另外还可以通过创建实例的方式获取生命周期函数，组件挂载前直接调用，页面挂载后通过`$(document).trigger('mounted')`触发执行
+```javascript
+组件jsx格式：
+<Counter name="mike"/>
+解析结果：
+React.createElement(Counter, {
+  name: "mike"
+});
+```
+```javascript
+class ReactComponent extends Unit {
+    getMarkUp(rootId) {
+        this._rootId = rootId;
+        /* 获取到Conponent类 */
+        let { type: Component, props } = this.currentElement;
+        let componentInstance = new Component(props);
+        /* 挂载前生命周期函数 */
+        componentInstance.componentWillMount &&
+            componentInstance.componentWillMount();
+        // 获取实例render返回值
+        let element = componentInstance.render();
+        let markUp = createReactUnit(element).getMarkUp(rootId);
+        /* 挂载后生命周期 */
+        $(document).on('mounted', () => {
+            componentInstance.componentDidMount &&
+                componentInstance.componentDidMount();
+        });
+        return markUp;
+    }
+}
+```
+示例：
+```javascript
+class SubCounter {
+  componentWillMount() {
+    console.log("child  即将挂载");
+  }
+  componentDidMount() {
+    console.log("child  挂载完成");
+  }
+  render() {
+    return <h1 style="color:green" onClick={show}>888</h1>
+  }
+}
+class Counter extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { number: 1 }
+  }
+  componentWillMount() {
+    console.log("parent  即将挂载");
+  }
+  componentDidMount() {
+    console.log("parent  挂载完成")
+  }
+  render() {
+    return <SubCounter />;
+  }
+}
+React.render(
+  <Counter name="mike" />,
+  document.getElementById('root')
+);
+```
+效果：
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/code-splitting
-
-### Analyzing the Bundle Size
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
-
-### Making a Progressive Web App
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
-
-### Advanced Configuration
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/advanced-configuration
-
-### Deployment
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/deployment
-
-### `npm run build` fails to minify
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify
+![](https://imgconvert.csdnimg.cn/aHR0cHM6Ly9naXRlZS5jb20vYWVpcHl1YW4vcGljdHVyZV9iZWQvcmF3L21hc3Rlci9pbWFnZXMvMjAyMDA1MTIxMzQxMDAucG5n?x-oss-process=image/format,png)

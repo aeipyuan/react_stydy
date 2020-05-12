@@ -2,6 +2,8 @@ class Component {
     constructor(props) {
         this.props = props;
     }
-    setState() { }
+    setState() {
+
+    }
 }
 export default Component;
